@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Firebase Google Auth</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.11/firebase-auth-compat.js"></script>
+  <style>
+    body {
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+
+    #tokenContainer {
+      display: none;
+      margin-top: 20px;
+      text-align: center;
+    }
+
+    #tokenDisplay {
+      max-width: 80%;
+      border: 1px solid #ccc;
+      padding: 10px;
+      border-radius: 8px;
+      background: #f5f5f5;
+      font-size: 14px;
+      word-break: break-all;
+    }
+
+    #copyBtn {
+      margin-top: 10px;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    #copyMsg {
+      display: none;
+      margin-top: 8px;
+      color: green;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <button id="googleSignInBtn">Sign In with Google</button>
+
+  <div id="tokenContainer">
+    <div id="tokenDisplay"></div>
+    <button id="copyBtn">Copy Full Token</button>
+    <div id="copyMsg">Copied to clipboard</div>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: 'AIzaSyAH0YegOcfvhGrSkcTmBiAB8wfW7oEuSco',
+      authDomain: 'auth-demo-a4386.firebaseapp.com',
+      projectId: 'auth-demo-a4386',
+      appId: '1:216685549681:web:4ba2c813f8c9439fc0a3d0',
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const auth = firebase.auth();
+    const provider = new firebase.auth.GoogleAuthProvider();
+
+    function shortenToken(token) {
+      if (token.length <= 30) return token;
+      return token.slice(0, 15) + '...' + token.slice(-15);
+    }
+
+    async function signInWithGoogle() {
+      try {
+        const result = await auth.signInWithPopup(provider);
+        const user = result.user;
+        if (!user) return;
+
+        const token = await user.getIdToken();
+        if (!token) return;
+
+        const tokenDisplay = document.getElementById('tokenDisplay');
+        const tokenContainer = document.getElementById('tokenContainer');
+        tokenDisplay.textContent = shortenToken(token);
+        tokenContainer.style.display = 'block';
+        tokenDisplay.dataset.fullToken = token;
+
+        const res = await fetch('http://localhost:5000/api/v1/auth/social_auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token, provider: provider.providerId }),
+        });
+
+        if (!res.ok) {
+          const errText = await res.text();
+          console.log('API Error: ' + errText);
+          return;
+        }
+
+        console.log('Sign-in successful');
+      } catch (error) {
+        console.error('Sign-in error:', error);
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      document
+        .getElementById('googleSignInBtn')
+        .addEventListener('click', signInWithGoogle);
+
+      const copyBtn = document.getElementById('copyBtn');
+      const copyMsg = document.getElementById('copyMsg');
+
+      copyBtn.addEventListener('click', async () => {
+        const fullToken = document.getElementById('tokenDisplay').dataset.fullToken;
+        if (!fullToken) return;
+        await navigator.clipboard.writeText(fullToken);
+        copyMsg.style.display = 'block';
+        setTimeout(() => {
+          copyMsg.style.display = 'none';
+        }, 2000);
+      });
+
+      auth.onAuthStateChanged(async (user) => {
+        if (user) {
+          const token = await user.getIdToken();
+          const tokenDisplay = document.getElementById('tokenDisplay');
+          const tokenContainer = document.getElementById('tokenContainer');
+          tokenDisplay.textContent = shortenToken(token);
+          tokenDisplay.dataset.fullToken = token;
+          tokenContainer.style.display = 'block';
+        }
+      });
+    });
+  </script>
+</body>
+
+</html>
